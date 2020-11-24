@@ -41,15 +41,15 @@ class Boat:
     def __str__(self):
         return '{} has {} hp.'.format(self.name, self.hp)
 
-    def hit(self, coordinates):
+    def hit(self, coordinates, owner_name, attacker_name):
         self.hp -= 1
-        print('{} was hit! hp left = {}'.format(self.name, self.hp))
+        print("{} has hit {}'s {}!! hp left = {}".format(attacker_name, owner_name, self.name, self.hp))
         self.position.pop(self.position.index(coordinates))
         if self.hp == 0:
-            self.sink()
+            self.sink(owner_name)
 
-    def sink(self):
-        print('{} has sunk!'.format(self.name))
+    def sink(self, owner_name):
+        print("{}'s {} was sunk!".format(owner_name, self.name))
         self.hasSunk = True
 
 
@@ -103,7 +103,7 @@ class Player:
         self.name = name
         self.autoMode = False
         self.hp = 0  # Player hp is the sum of the hp's of his boats.
-        print('Player {} has joined the game!'.format(self.name))
+        print('Player {} has joined the game!\n'.format(self.name))
         self.boats = []
         self.board = generic_board.copy()
         self.hidden_board = generic_board.copy()
@@ -662,12 +662,12 @@ def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
     for boat in my_defending_player.boats:
 
         if my_shot_coordinates in boat.position:
-            boat.hit(my_shot_coordinates)
+            boat.hit(my_shot_coordinates, my_defending_player.name, my_attacking_player.name )
             my_defending_player.board[my_shot_coordinates] = 'X'
             my_attacking_player.hidden_board[my_shot_coordinates] = 'X'
             return True
 
-    print('Shot missed!')
+    print('{} missed the shot!'.format(my_attacking_player.name))
     # Prevent from writing * if it was repeated shot on a hit boat.
     if my_defending_player.board[my_shot_coordinates] != 'X':
         my_defending_player.board[my_shot_coordinates] = '*'
@@ -720,9 +720,9 @@ def game_setup():
     my_quit = True
 
     while not my_user_input_ok:
-        print('{:^60}'.format(60 * '*'))
-        print('{:^60}'.format('Welcome to Naval Battle 1.0'))
-        print('{:^60}'.format(60 * '*'))
+        print('{:^105}'.format(105 * '*'))
+        print('{:^105}'.format('Welcome to Naval Battle 1.0'))
+        print('{:^105}'.format(105 * '*'))
         print('[1] - Player Vs Computer\n[2] - Player Vs Player\n[Q] - Quit\n')
         user_input = input('Your option: ').upper()
         my_user_input_ok = user_input in ['1', '2', 'Q']
@@ -757,17 +757,32 @@ player1, player2, end_game = game_setup()
 
 shots_taken = 0
 win = False
+possible_targets = list(generic_board.keys())
+
 while not win and not end_game:
     attacking_player, defending_player = swap_player_turn()
     user_input_ok = False
     while not user_input_ok:
-        attacking_player.update_boards()
-        shot_coordinates = input('{}, insert your shot coordinates (A1 to J10): '.format(attacking_player.name)).upper()
-        user_input_ok = shot_coordinates in list(attacking_player.board.keys())
 
+        if not isinstance(attacking_player, ComputerOpponent):
+            attacking_player.update_boards()
+            shot_coordinates = input('{}, insert your shot coordinates (A1 to J10): '.format(attacking_player.name)).upper()
+            user_input_ok = shot_coordinates in possible_targets
+        else:
+            shot_coordinates = choice(possible_targets)
+            user_input_ok = True
+
+    print('{:^105}'.format(105 * '-'))
+    print('{:^105}'.format('Battle Report:'))
+    print('{:^105}'.format(105 * '.'))
+    print('{} fired at {}!'.format(attacking_player.name, shot_coordinates))
     hit = check_hit(attacking_player, defending_player, shot_coordinates)
-    attacking_player.update_boards()
-    input('Press Enter to continue...')
+    print('{:^105}'.format(105 * '-'))
+
+    if not isinstance(attacking_player, ComputerOpponent):
+        attacking_player.update_boards()
+        input('Press Enter to continue...')
+
     win = check_win(attacking_player, defending_player)
     if win:
         if isinstance(attacking_player, ComputerOpponent):
