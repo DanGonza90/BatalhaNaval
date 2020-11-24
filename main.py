@@ -1,5 +1,5 @@
 from abc import ABCMeta
-
+from random import choice
 # Game boards initialization
 
 col_names = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
@@ -17,11 +17,11 @@ for i in col_names:
 class Settings:
     def __init__(self):
         # Nr of boats
-        self.nrGunboats = 1
-        self.nrCruisers = 0
-        self.nrSubmarines = 0
-        self.nrCarriers = 0
-        self.nrDestroyers = 0
+        self.nrGunboats = 3
+        self.nrCruisers = 2
+        self.nrSubmarines = 4
+        self.nrCarriers = 1
+        self.nrDestroyers = 1
 
 
 settings = Settings()
@@ -101,6 +101,7 @@ class Gunboat(Boat):
 class Player:
     def __init__(self, name):
         self.name = name
+        self.autoMode = False
         self.hp = 0  # Player hp is the sum of the hp's of his boats.
         print('Player {} has joined the game!'.format(self.name))
         self.boats = []
@@ -109,7 +110,6 @@ class Player:
 
         #  Give boats to the player
         self.assign_boats()
-        self.boat_placement()
         self.get_player_hp()
 
     def assign_boats(self):
@@ -190,15 +190,15 @@ class Player:
                     3 * '-', 3 * '-', 3 * '-', 3 * '-',
                     3 * '-', 3 * '-', 3 * '-'))
 
-    def boat_placement(self):
+    def boat_placement(self, auto):
 
         def validate_start_pos(my_boat) -> tuple[dict, list]:
-            user_input_ok = False
+            my_user_input_ok = False
             valid = False
             my_start_pos = generic_pos.copy()
             my_possible_end_pos = []
 
-            while not user_input_ok or not valid:
+            while not my_user_input_ok or not valid:
                 # Returns boat start position, if it is valid and a list of possible end positions
                 self.update_boards()
                 my_start_pos = generic_pos.copy()
@@ -219,19 +219,19 @@ class Player:
                         if not adjacency_ok:
                             print('Invalid input. Boat cannot be adjacent to another boat. ')
                             input('Press Enter to continue...')
-                            user_input_ok = False
+                            my_user_input_ok = False
                         else:
-                            user_input_ok = True
+                            my_user_input_ok = True
                     else:
                         print('Invalid input. Boat cannot be placed on top of another boat.')
                         input('Press Enter to continue...')
-                        user_input_ok = False
+                        my_user_input_ok = False
                 else:
                     print('Invalid input. Insert correct coordinate input (A1 to J10).')
                     input('Press Enter to continue...')
-                    user_input_ok = False
+                    my_user_input_ok = False
 
-                if user_input_ok:
+                if my_user_input_ok:
                     if not isinstance(my_boat, Submarine):
                         mid_ok = True  # True by default. Only check if boat size larger than 3.
 
@@ -397,6 +397,184 @@ class Player:
 
             return my_end_pos, valid
 
+        def auto_validate_start_pos(my_boat) -> tuple[dict, list]:
+            my_user_input_ok = False
+            valid = False
+            my_start_pos = generic_pos.copy()
+            my_possible_end_pos = []
+            possible_start_positions = list(generic_board.keys())
+            while not my_user_input_ok or not valid:
+
+                my_start_pos = generic_pos.copy()
+                my_possible_end_pos = []
+                my_start_pos['Coord'] = choice(list(generic_board.keys()))
+
+                if self.board[my_start_pos['Coord']] == '':
+                    # Get row and column of the start pos and their indexes on the row and col list
+                    my_start_pos['row'] = my_start_pos['Coord'][0]
+                    my_start_pos['column'] = my_start_pos['Coord'][1:]
+                    my_start_pos['row_name_index'] = row_names.index(my_start_pos['row'])
+                    my_start_pos['column_name_index'] = col_names.index(my_start_pos['column'])
+                    adjacency_ok = check_adjacent(my_start_pos['row_name_index'], my_start_pos['column_name_index'])
+                    if not adjacency_ok:
+                       # possible_start_positions.pop(possible_start_positions.index(my_start_pos['Coord']))
+                        my_user_input_ok = False
+                    else:
+                        my_user_input_ok = True
+                else:
+                  #  possible_start_positions.pop(possible_start_positions.index(my_start_pos['Coord']))
+                    my_user_input_ok = False
+
+                if my_user_input_ok:
+                    if not isinstance(my_boat, Submarine):
+                        mid_ok = True  # True by default. Only check if boat size larger than 3.
+
+                        my_end_pos = generic_pos.copy()
+                        mid_pos = generic_pos.copy()
+                        # Bottom direction
+                        try:  # Check if we are out of the board
+                            my_end_pos['row_name_index'] = my_start_pos['row_name_index'] + my_boat.size - 1
+                            my_end_pos['row'] = row_names[my_end_pos['row_name_index']]
+                        except IndexError:
+                            pass
+                        else:
+                            if my_end_pos['row_name_index'] >= 0:
+                                my_end_pos['column'] = my_start_pos['column']
+                                my_end_pos['column_name_index'] = col_names.index(my_end_pos['column'])
+                                my_end_pos['Coord'] = my_end_pos['row'] + my_end_pos['column']
+
+                                # If the boat size is larger than 3, we check the adjacency on the middle cells.
+                                if my_boat.size > 3:
+                                    mid_pos['row_name_index'] = my_end_pos['row_name_index'] - 2
+                                    mid_pos['row'] = row_names[mid_pos['row_name_index']]
+                                    mid_pos['column'] = my_start_pos['column']
+                                    mid_pos['column_name_index'] = col_names.index(mid_pos['column'])
+                                    mid_pos['Coord'] = mid_pos['row'] + mid_pos['column']
+                                    mid_ok = check_adjacent(mid_pos['row_name_index'], mid_pos['column_name_index'])
+
+                                end_ok = check_adjacent(my_end_pos['row_name_index'], my_end_pos['column_name_index'])
+
+                                if mid_ok and end_ok:
+                                    my_possible_end_pos.append(my_end_pos)
+                        finally:
+                            pass
+
+                        my_end_pos = generic_pos.copy()
+                        mid_pos = generic_pos.copy()
+                        # Top direction
+                        try:  # Check if we are out of the board
+                            my_end_pos['row_name_index'] = my_start_pos['row_name_index'] - my_boat.size + 1
+                            my_end_pos['row'] = row_names[my_end_pos['row_name_index']]
+                        except IndexError:
+
+                            pass
+                        else:
+                            if my_end_pos['row_name_index'] >= 0:
+                                my_end_pos['column'] = my_start_pos['column']
+                                my_end_pos['column_name_index'] = col_names.index(my_end_pos['column'])
+                                my_end_pos['Coord'] = my_end_pos['row'] + my_end_pos['column']
+
+                                # If the boat size is larger than 3, we check the adjacency on the middle cells.
+                                if my_boat.size > 3:
+                                    mid_pos['row_name_index'] = my_end_pos['row_name_index'] + 2
+                                    mid_pos['row'] = row_names[mid_pos['row_name_index']]
+                                    mid_pos['column'] = my_start_pos['column']
+                                    mid_pos['column_name_index'] = col_names.index(mid_pos['column'])
+                                    mid_pos['Coord'] = mid_pos['row'] + mid_pos['column']
+                                    mid_ok = check_adjacent(mid_pos['row_name_index'], mid_pos['column_name_index'])
+
+                                end_ok = check_adjacent(my_end_pos['row_name_index'], my_end_pos['column_name_index'])
+
+                                if mid_ok and end_ok:
+                                    my_possible_end_pos.append(my_end_pos)
+                        finally:
+                            pass
+
+                        my_end_pos = generic_pos.copy()
+                        mid_pos = generic_pos.copy()
+
+                        # Right direction
+                        try:  # Check if we are out of the board
+                            my_end_pos['column_name_index'] = my_start_pos['column_name_index'] + my_boat.size - 1
+                            my_end_pos['column'] = col_names[my_end_pos['column_name_index']]
+                        except IndexError:
+                            pass
+                        else:
+                            if my_end_pos['column_name_index'] >= 0:
+                                my_end_pos['row'] = my_start_pos['row']
+                                my_end_pos['row_name_index'] = row_names.index(my_end_pos['row'])
+                                my_end_pos['Coord'] = my_end_pos['row'] + my_end_pos['column']
+
+                                # If the boat size is larger than 3, we check the adjacency on the middle cells.
+                                if my_boat.size > 3:
+                                    mid_pos['column_name_index'] = my_end_pos['column_name_index'] - 2
+                                    mid_pos['column'] = col_names[mid_pos['column_name_index']]
+                                    mid_pos['row'] = my_start_pos['row']
+                                    mid_pos['row_name_index'] = row_names.index(mid_pos['row'])
+
+                                    mid_pos['Coord'] = mid_pos['row'] + mid_pos['column']
+                                    mid_ok = check_adjacent(mid_pos['row_name_index'], mid_pos['column_name_index'])
+
+                                end_ok = check_adjacent(my_end_pos['row_name_index'], my_end_pos['column_name_index'])
+
+                                if mid_ok and end_ok:
+                                    my_possible_end_pos.append(my_end_pos)
+                        finally:
+                            pass
+
+                        my_end_pos = generic_pos.copy()
+                        mid_pos = generic_pos.copy()
+
+                        # Left direction
+                        try:  # Check if we are out of the board
+                            my_end_pos['column_name_index'] = my_start_pos['column_name_index'] - my_boat.size + 1
+                            my_end_pos['column'] = col_names[my_end_pos['column_name_index']]
+                        except IndexError:
+                            pass
+                        else:
+                            if my_end_pos['column_name_index'] >= 0:
+                                my_end_pos['row'] = my_start_pos['row']
+                                my_end_pos['row_name_index'] = row_names.index(my_end_pos['row'])
+                                my_end_pos['Coord'] = my_end_pos['row'] + my_end_pos['column']
+
+                                # If the boat size is larger than 3, we check the adjacency on the middle cells.
+                                if my_boat.size > 3:
+                                    mid_pos['column_name_index'] = my_end_pos['column_name_index'] + 2
+                                    mid_pos['column'] = col_names[mid_pos['column_name_index']]
+                                    mid_pos['row'] = my_start_pos['row']
+                                    mid_pos['row_name_index'] = row_names.index(mid_pos['row'])
+
+                                    mid_pos['Coord'] = mid_pos['row'] + mid_pos['column']
+                                    mid_ok = check_adjacent(mid_pos['row_name_index'], mid_pos['column_name_index'])
+
+                                end_ok = check_adjacent(my_end_pos['row_name_index'], my_end_pos['column_name_index'])
+
+                                if mid_ok and end_ok:
+                                    my_possible_end_pos.append(my_end_pos)
+                        finally:
+                            pass
+
+                        if len(my_possible_end_pos) == 0:
+
+                            valid = False
+                        else:
+                            valid = True
+                            self.board[my_start_pos['Coord']] = 'X'
+                    else:
+                        valid = True
+                        self.board[my_start_pos['Coord']] = my_boat.symbol
+            teste = 1
+            return my_start_pos, my_possible_end_pos
+
+        def auto_validate_end_pos(my_possible_end_pos, my_boat):
+
+            possible_coordinates = [a['Coord'] for a in my_possible_end_pos]
+            input_end_pos = choice(possible_coordinates)
+
+            my_end_pos = my_possible_end_pos[possible_coordinates.index(input_end_pos)]
+
+            return my_end_pos, True
+
         def check_adjacent(row_index, col_index):
             # Size of "board"
             rows = 9
@@ -442,22 +620,28 @@ class Player:
 
         end_pos = {}
 
-        print('***************** Boat position rules: *****************')
-        print('- Boats cannot be adjacent.\n- Boats cannot intersect boats.')
+        if not auto:
+            print('***************** Boat position rules: *****************')
+            print('- Boats cannot be adjacent.\n- Boats cannot intersect boats.')
         for boat in self.boats:
 
             # Input and validate boat start position
             # Check for possible end positions, depending on starting position, boat intersections, adjacency
             # and start location
-            start_pos, possible_end_pos = validate_start_pos(boat)
+            if not auto:
+                start_pos, possible_end_pos = validate_start_pos(boat)
+            else:
+                start_pos, possible_end_pos = auto_validate_start_pos(boat)
 
             if isinstance(boat, Submarine):
                 pass
             else:
-                valid_user_input = False
-                while not valid_user_input:
-                    end_pos, valid_user_input = validate_end_pos(possible_end_pos, boat)
-
+                if not auto:
+                    valid_user_input = False
+                    while not valid_user_input:
+                        end_pos, valid_user_input = validate_end_pos(possible_end_pos, boat)
+                else:
+                    end_pos, valid_user_input = auto_validate_end_pos(possible_end_pos, boat)
             place_boat(start_pos, end_pos, boat)
 
     def get_player_hp(self):
@@ -465,6 +649,11 @@ class Player:
         for boat in self.boats:
             hp += boat.hp
         self.hp = hp
+
+
+class ComputerOpponent(Player):
+    def __init__(self):
+        super(ComputerOpponent, self).__init__('Computer Opponent')
 
 
 def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
@@ -479,8 +668,8 @@ def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
             return True
 
     print('Shot missed!')
-    if my_defending_player.board[
-        my_shot_coordinates] != 'X':  # Prevent from writing * if it was repeated shot on a hit boat.
+    # Prevent from writing * if it was repeated shot on a hit boat.
+    if my_defending_player.board[my_shot_coordinates] != 'X':
         my_defending_player.board[my_shot_coordinates] = '*'
         my_attacking_player.hidden_board[my_shot_coordinates] = '*'
     return False
@@ -504,14 +693,71 @@ def check_win(my_attacking_player, my_defending_player):
     return False
 
 
+def player_setup(player):
+    my_user_input_ok = False
+    boat_placement_auto = ''
+
+    if not isinstance(player, ComputerOpponent):
+        print('Boat deployment method: ')
+        print('[A] - Automatic')
+        print('[M] - Manual')
+        while not my_user_input_ok:
+            boat_placement_auto = input('{}, your choice: '.format(player.name)).upper()
+            my_user_input_ok = boat_placement_auto in ['A', 'M']
+        if boat_placement_auto == 'A':
+            player.boat_placement(True)
+        elif boat_placement_auto == 'M':
+            player.boat_placement(False)
+    else:
+        player.boat_placement(True)
+
+
+def game_setup():
+    user_input = ''
+    my_user_input_ok = False
+    my_player1 = 0
+    my_player2 = 0
+    my_quit = True
+
+    while not my_user_input_ok:
+        print('{:^60}'.format(60 * '*'))
+        print('{:^60}'.format('Welcome to Naval Battle 1.0'))
+        print('{:^60}'.format(60 * '*'))
+        print('[1] - Player Vs Computer\n[2] - Player Vs Player\n[Q] - Quit\n')
+        user_input = input('Your option: ').upper()
+        my_user_input_ok = user_input in ['1', '2', 'Q']
+
+    if user_input == '1':
+        player1_name = input('Player 1, insert your name: ')
+        my_player1 = Player(player1_name)
+        my_player2 = ComputerOpponent()
+        my_quit = False
+    elif user_input == '2':
+        player1_name = input('Player 1, insert your name: ')
+        player2_name = input('Player 2, insert your name: ')
+        my_player1 = Player(player1_name)
+        my_player2 = Player(player2_name)
+        my_quit = False
+    elif user_input == 'Q':
+        my_player1 = 0
+        my_player2 = 0
+        my_quit = True
+
+    if not my_quit:
+        player_setup(my_player1)
+        player_setup(my_player2)
+
+    return my_player1, my_player2, my_quit
+
+
 player_turn = 0
 shot_coordinates = ''
-player1 = Player('Daniel')
-player2 = Player('Jakim')
+
+player1, player2, end_game = game_setup()
 
 shots_taken = 0
 win = False
-while not win:
+while not win and not end_game:
     attacking_player, defending_player = swap_player_turn()
     user_input_ok = False
     while not user_input_ok:
@@ -523,3 +769,8 @@ while not win:
     attacking_player.update_boards()
     input('Press Enter to continue...')
     win = check_win(attacking_player, defending_player)
+    if win:
+        if isinstance(attacking_player, ComputerOpponent):
+            print("Yet again, victory is mine! You are no match for my Armada!")
+        else:
+            print("Today I am defeated. But the war is not over! I look forward for our next battle!!")
