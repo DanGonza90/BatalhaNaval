@@ -101,7 +101,6 @@ class Gunboat(Boat):
 class Player:
     def __init__(self, name):
         self.name = name
-        self.autoMode = False
         self.hp = 0  # Player hp is the sum of the hp's of his boats.
         print('Player {} has joined the game!\n'.format(self.name))
         self.boats = []
@@ -657,14 +656,63 @@ class ComputerOpponent(Player):
         self.difficulty = difficulty
         self.available_targets = list(generic_board.keys())
         self.targets = self.available_targets.copy()
+        self.first_hit_position = ''
+        self.searching_for_boat = False
+        self.search_mode = ''
+
+    def get_target_neighbors(self, my_hit_coordinates, mode):
+        # Size of "board"
+        rows = 9
+        cols = 9
+        target_cross_neighbors = []
+        row_index = row_names.index(my_hit_coordinates[0])
+        col_index = col_names.index(my_hit_coordinates[1:])
+        neighbors = []
+
+        if mode == 'Cross':
+            neighbors = lambda x, y: [(x2, y2) for x2 in range(x - 1, x + 2)
+                                      for y2 in range(y - 1, y + 2)
+                                      if (-1 < x <= rows and
+                                          -1 < y <= cols and
+                                          (x != x2 or y != y2) and
+                                          (x == x2 or y == y2) and
+                                          (0 <= x2 <= rows) and
+                                          (0 <= y2 <= cols))]
+        elif mode == 'Row':
+            neighbors = lambda x, y: [(x2, y2) for x2 in range(x - 1, x + 2)
+                                      for y2 in range(y - 1, y + 2)
+                                      if (-1 < x <= rows and
+                                          -1 < y <= cols and
+                                          (x != x2 or y != y2) and
+                                          (x == x2) and
+                                          (0 <= x2 <= rows) and
+                                          (0 <= y2 <= cols))]
+        elif mode == 'Column':
+            neighbors = lambda x, y: [(x2, y2) for x2 in range(x - 1, x + 2)
+                                      for y2 in range(y - 1, y + 2)
+                                      if (-1 < x <= rows and
+                                          -1 < y <= cols and
+                                          (x != x2 or y != y2) and
+                                          (y == y2) and
+                                          (0 <= x2 <= rows) and
+                                          (0 <= y2 <= cols))]
+        else:
+            print('Insert Error here. Func get_target_cross_neighbors. wrong arguments.')
+
+        for row_neighbor_index, col_neighbor_index in neighbors(row_index, col_index):
+            name = row_names[row_neighbor_index] + str(col_names[col_neighbor_index])
+            target_cross_neighbors.append(name)
+
+        return list(set(target_cross_neighbors) & set(self.available_targets))
 
     def update_targets(self, *nargs):
 
         if len(nargs) == 2:
-            my_hit = nargs[0]
+            hit = nargs[0]
             hit_coordinates = nargs[1]
+            boat_position =[]
         elif len(nargs) == 3:
-            my_hit = nargs[0]
+            hit = nargs[0]
             hit_coordinates = nargs[1]
             boat_position = nargs[2]
         else:
@@ -673,14 +721,34 @@ class ComputerOpponent(Player):
 
         self.available_targets.pop(self.available_targets.index(hit_coordinates))
 
-        if my_hit:
+        if hit:
             # Easy Mode
             if self.difficulty == 'Easy':
                 self.targets = self.available_targets.copy()  # Fire at new random positions
 
             # Normal Mode
             elif self.difficulty == 'Normal':
-                pass
+                if len(boat_position) > 0:  # Boat is still alive
+                    if self.searching_for_boat:  # Has hit the boat before
+                        if hit_coordinates[0] == self.first_hit_position[0]:  # Hit on the same row
+                            self.search_mode = 'Row'
+                        elif hit_coordinates[1:] == self.first_hit_position[1:]:  # Hit on the same column
+                            self.search_mode = 'Column'
+                        self.targets = self.get_target_neighbors(hit_coordinates, self.search_mode)
+                        if len(self.targets) == 0:  # Could happen if the boat was on the edge of the board.
+                            self.targets = self.get_target_neighbors(self.first_hit_position, self.search_mode)
+
+                    else:
+                        self.searching_for_boat = True
+                        self.search_mode = 'Cross'
+                        self.targets = self.get_target_neighbors(hit_coordinates, self.search_mode)
+                        self.first_hit_position = hit_coordinates
+
+                else:
+                    self.targets = self.available_targets.copy()  # Fire at new random positions
+                    self.searching_for_boat = False
+                    self.first_hit_position = ''
+
 
             # Hard Mode
             elif self.difficulty == 'Hard':
@@ -692,8 +760,15 @@ class ComputerOpponent(Player):
                 print('Invalid Difficulty inserted. Defaulting to EASY')
 
         else:
-            self.targets = self.available_targets.copy()  # Fire at new random positions
+            if self.searching_for_boat:  # If it was searching for a  boat, continue searching the area.
+                self.targets = self.get_target_neighbors(self.first_hit_position, self.search_mode)
+            else:
+                self.targets = self.available_targets.copy()  # Fire at new random positions
+
         teste1 = 0
+
+
+
 
 def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
     #  Searches all defending player's boats positions.
@@ -703,7 +778,7 @@ def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
         if my_shot_coordinates in boat.position:
             boat.hit(my_shot_coordinates, my_defending_player.name, my_attacking_player.name )
             my_defending_player.board[my_shot_coordinates] = 'X'
-            my_attacking_player.hidden_board[my_shot_coordinates] = 'X'
+            my_attacking_player.hidden_board[my_shot_coordinates] = boat.symbol
             if isinstance(my_attacking_player, ComputerOpponent):
                 my_attacking_player.update_targets(True, my_shot_coordinates, boat.position)
             return True
@@ -831,7 +906,7 @@ while not win and not end_game:
     print('{:^105}'.format('Battle Report:'))
     print('{:^105}'.format(105 * '.'))
     print('{} fired at {}!'.format(attacking_player.name, shot_coordinates))
-    hit = check_hit(attacking_player, defending_player, shot_coordinates)
+    check_hit(attacking_player, defending_player, shot_coordinates)
     print('{:^105}'.format(105 * '-'))
 
     if not isinstance(attacking_player, ComputerOpponent):
