@@ -1,7 +1,21 @@
 from abc import ABCMeta
 from random import choice
-# Game boards initialization
+from os import system, name as os_name
+from time import sleep
 
+
+# define our clear function
+def clear():
+    # for windows
+    if os_name == 'nt':
+        _ = system('cls')
+
+        # for mac and linux(here, os.name is 'posix')
+    else:
+        _ = system('clear')
+
+
+# Game boards initialization
 col_names = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
 row_names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 generic_board = {}
@@ -24,7 +38,28 @@ class Settings:
         self.nrDestroyers = 1
 
 
+class Errors:
+    def __init__(self):
+        self.bad_coordinate_input = 1000
+        self.bad_option_selection = 1001
+
+
 settings = Settings()
+errors = Errors()
+
+
+def print_errors(error_code):
+
+    if error_code == errors.bad_coordinate_input:
+        message = 'Invalid input! Insert coordinates between A1 and J10.'
+    elif error_code == errors.bad_option_selection:
+        message = 'Invalid input! Insert one of the available options.'
+    else:
+        message = 'Error printing function was called without an error code.'
+    clear()
+    print('{}{:^105}'.format(14 * '\n', message))
+    sleep(3)
+    clear()
 
 
 class Boat:
@@ -127,7 +162,7 @@ class Player:
         self.board_values = list(self.board.values())
         self.hidden_board_values = list(self.hidden_board.values())
         print('')
-        print('{:^43}{:^20}{:^43}'.format(43 * ' ', '***' + self.name + '***', 43 * ' '))
+        print('{:^43}{:^20}{:^43}'.format(43 * ' ', 'Player: ' + self.name, 43 * ' '))
         print(
             '{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}{:^20}{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}|{:^3}'.format(
                 '', col_names[0], col_names[1],
@@ -401,7 +436,6 @@ class Player:
             valid = False
             my_start_pos = generic_pos.copy()
             my_possible_end_pos = []
-            possible_start_positions = list(generic_board.keys())
             while not my_user_input_ok or not valid:
 
                 my_start_pos = generic_pos.copy()
@@ -562,7 +596,7 @@ class Player:
                     else:
                         valid = True
                         self.board[my_start_pos['Coord']] = my_boat.symbol
-            teste = 1
+
             return my_start_pos, my_possible_end_pos
 
         def auto_validate_end_pos(my_possible_end_pos, my_boat):
@@ -710,7 +744,7 @@ class ComputerOpponent(Player):
         if len(nargs) == 2:
             hit = nargs[0]
             hit_coordinates = nargs[1]
-            boat_position =[]
+            boat_position = []
         elif len(nargs) == 3:
             hit = nargs[0]
             hit_coordinates = nargs[1]
@@ -749,7 +783,6 @@ class ComputerOpponent(Player):
                     self.searching_for_boat = False
                     self.first_hit_position = ''
 
-
             # Hard Mode
             elif self.difficulty == 'Hard':
                 if len(boat_position) > 0:  # Boat is still alive
@@ -765,10 +798,6 @@ class ComputerOpponent(Player):
             else:
                 self.targets = self.available_targets.copy()  # Fire at new random positions
 
-        teste1 = 0
-
-
-
 
 def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
     #  Searches all defending player's boats positions.
@@ -776,7 +805,7 @@ def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
     for boat in my_defending_player.boats:
 
         if my_shot_coordinates in boat.position:
-            boat.hit(my_shot_coordinates, my_defending_player.name, my_attacking_player.name )
+            boat.hit(my_shot_coordinates, my_defending_player.name, my_attacking_player.name)
             my_defending_player.board[my_shot_coordinates] = 'X'
             my_attacking_player.hidden_board[my_shot_coordinates] = boat.symbol
             if isinstance(my_attacking_player, ComputerOpponent):
@@ -816,12 +845,18 @@ def player_setup(player):
     boat_placement_auto = ''
 
     if not isinstance(player, ComputerOpponent):
-        print('Boat deployment method: ')
-        print('[A] - Automatic')
-        print('[M] - Manual')
+        clear()
         while not my_user_input_ok:
+            print('{:^105}'.format(105 * '*'))
+            print('{:^105}'.format('Welcome to Naval Battle 1.0'))
+            print('{:^105}'.format(105 * '*'))
+            print('Boat deployment method: ')
+            print('[A] - Automatic')
+            print('[M] - Manual')
             boat_placement_auto = input('{}, your choice: '.format(player.name)).upper()
             my_user_input_ok = boat_placement_auto in ['A', 'M']
+            if not my_user_input_ok:
+                print_errors(errors.bad_option_selection)
         if boat_placement_auto == 'A':
             player.boat_placement(True)
         elif boat_placement_auto == 'M':
@@ -838,21 +873,31 @@ def game_setup():
     my_quit = True
 
     while not my_user_input_ok:
+        clear()
         print('{:^105}'.format(105 * '*'))
         print('{:^105}'.format('Welcome to Naval Battle 1.0'))
         print('{:^105}'.format(105 * '*'))
+        print('Player selection:')
         print('[1] - Player Vs Computer\n[2] - Player Vs Player\n[Q] - Quit\n')
         user_input = input('Your option: ').upper()
         my_user_input_ok = user_input in ['1', '2', 'Q']
+        if not my_user_input_ok:
+            print_errors(errors.bad_option_selection)
 
     if user_input == '1':
         my_user_input_ok = False
         my_difficulty = ''
         while not my_user_input_ok:
+            clear()
+            print('{:^105}'.format(105 * '*'))
+            print('{:^105}'.format('Welcome to Naval Battle 1.0'))
+            print('{:^105}'.format(105 * '*'))
             print('Computer difficulty selection:')
             print('[1] - Easy\n[2] - Normal\n[3] - Hard\n')
             my_difficulty = input('Your option: ')
             my_user_input_ok = my_difficulty in ['1', '2', '3']
+            if not my_user_input_ok:
+                print_errors(errors.bad_option_selection)
         player1_name = input('Player 1, insert your name: ')
         my_player1 = Player(player1_name)
         if my_difficulty == '1':
@@ -889,6 +934,10 @@ shots_taken = 0
 win = False
 possible_targets = list(generic_board.keys())
 
+clear()
+print('{:^105}'.format(105 * '-'))
+print('{:^105}'.format('Game Started'))
+print('{:^105}'.format(105 * '.'))
 while not win and not end_game:
     attacking_player, defending_player = swap_player_turn()
     user_input_ok = False
@@ -898,10 +947,12 @@ while not win and not end_game:
             attacking_player.update_boards()
             shot_coordinates = input('{}, insert your shot coordinates (A1 to J10): '.format(attacking_player.name)).upper()
             user_input_ok = shot_coordinates in possible_targets
+            if not user_input_ok:
+                print_errors(errors.bad_coordinate_input)
         else:
             shot_coordinates = choice(attacking_player.targets)
             user_input_ok = True
-
+    clear()
     print('{:^105}'.format(105 * '-'))
     print('{:^105}'.format('Battle Report:'))
     print('{:^105}'.format(105 * '.'))
@@ -915,7 +966,17 @@ while not win and not end_game:
 
     win = check_win(attacking_player, defending_player)
     if win:
-        if isinstance(attacking_player, ComputerOpponent):
-            print("Yet again, victory is mine! You are no match for my Armada!")
-        else:
-            print("Today I am defeated. But the war is not over! I look forward for our next battle!!")
+        if isinstance(player2, ComputerOpponent):
+            clear()
+            if isinstance(attacking_player, ComputerOpponent):
+                computer_message = "Yet again, victory is mine! You are no match for my armada!"
+            else:
+                computer_message = "Today I am defeated. But the war is not over! "
+            print('{}{:^105}'.format(14 * '\n', computer_message))
+            sleep(3)
+        message = 'Thank you for playing!\nCreated by: Daniel Gonçalves, November 2020'
+        clear()
+        print('{}{:^105}'.format(14 * '\n', message))
+        sleep(3)
+
+
