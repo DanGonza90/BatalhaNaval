@@ -652,9 +652,48 @@ class Player:
 
 
 class ComputerOpponent(Player):
-    def __init__(self):
-        super(ComputerOpponent, self).__init__('Computer Opponent')
+    def __init__(self, difficulty):
+        super(ComputerOpponent, self).__init__(difficulty + ' Computer Opponent')
+        self.difficulty = difficulty
+        self.available_targets = list(generic_board.keys())
+        self.targets = self.available_targets.copy()
 
+    def update_targets(self, *nargs):
+
+        if len(nargs) == 2:
+            my_hit = nargs[0]
+            hit_coordinates = nargs[1]
+        elif len(nargs) == 3:
+            my_hit = nargs[0]
+            hit_coordinates = nargs[1]
+            boat_position = nargs[2]
+        else:
+            print('Insert Exception here! Invalid number of arguments on func update_targets')
+            return
+
+        self.available_targets.pop(self.available_targets.index(hit_coordinates))
+
+        if my_hit:
+            # Easy Mode
+            if self.difficulty == 'Easy':
+                self.targets = self.available_targets.copy()  # Fire at new random positions
+
+            # Normal Mode
+            elif self.difficulty == 'Normal':
+                pass
+
+            # Hard Mode
+            elif self.difficulty == 'Hard':
+                if len(boat_position) > 0:  # Boat is still alive
+                    self.targets = boat_position  # Keep focused on that boat
+                else:
+                    self.targets = self.available_targets.copy()  # Fire at new random positions
+            else:
+                print('Invalid Difficulty inserted. Defaulting to EASY')
+
+        else:
+            self.targets = self.available_targets.copy()  # Fire at new random positions
+        teste1 = 0
 
 def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
     #  Searches all defending player's boats positions.
@@ -665,6 +704,8 @@ def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
             boat.hit(my_shot_coordinates, my_defending_player.name, my_attacking_player.name )
             my_defending_player.board[my_shot_coordinates] = 'X'
             my_attacking_player.hidden_board[my_shot_coordinates] = 'X'
+            if isinstance(my_attacking_player, ComputerOpponent):
+                my_attacking_player.update_targets(True, my_shot_coordinates, boat.position)
             return True
 
     print('{} missed the shot!'.format(my_attacking_player.name))
@@ -672,6 +713,8 @@ def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
     if my_defending_player.board[my_shot_coordinates] != 'X':
         my_defending_player.board[my_shot_coordinates] = '*'
         my_attacking_player.hidden_board[my_shot_coordinates] = '*'
+        if isinstance(my_attacking_player, ComputerOpponent):
+            my_attacking_player.update_targets(False, my_shot_coordinates)
     return False
 
 
@@ -728,9 +771,21 @@ def game_setup():
         my_user_input_ok = user_input in ['1', '2', 'Q']
 
     if user_input == '1':
+        my_user_input_ok = False
+        my_difficulty = ''
+        while not my_user_input_ok:
+            print('Computer difficulty selection:')
+            print('[1] - Easy\n[2] - Normal\n[3] - Hard\n')
+            my_difficulty = input('Your option: ')
+            my_user_input_ok = my_difficulty in ['1', '2', '3']
         player1_name = input('Player 1, insert your name: ')
         my_player1 = Player(player1_name)
-        my_player2 = ComputerOpponent()
+        if my_difficulty == '1':
+            my_player2 = ComputerOpponent('Easy')
+        elif my_difficulty == '2':
+            my_player2 = ComputerOpponent('Normal')
+        elif my_difficulty == '3':
+            my_player2 = ComputerOpponent('Hard')
         my_quit = False
     elif user_input == '2':
         player1_name = input('Player 1, insert your name: ')
@@ -769,7 +824,7 @@ while not win and not end_game:
             shot_coordinates = input('{}, insert your shot coordinates (A1 to J10): '.format(attacking_player.name)).upper()
             user_input_ok = shot_coordinates in possible_targets
         else:
-            shot_coordinates = choice(possible_targets)
+            shot_coordinates = choice(attacking_player.targets)
             user_input_ok = True
 
     print('{:^105}'.format(105 * '-'))
