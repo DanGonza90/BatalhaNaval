@@ -789,7 +789,7 @@ class ComputerOpponent(Player):
         if hit:
             # Easy Mode
             if self.difficulty == 'Easy':
-                if len(boat_position) ==  0:  # Boat is still alive
+                if len(boat_position) == 0:  # Boat is no longer alive
                     self.remove_adjacent_tiles_from_available_targets(boat_permanent_position)
                 self.targets = self.available_targets.copy()  # Fire at new random positions
 
