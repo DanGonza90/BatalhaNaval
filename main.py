@@ -58,7 +58,7 @@ def print_errors(error_code):
         message = 'Error printing function was called without an error code.'
     clear()
     print('{}{:^105}'.format(14 * '\n', message))
-    sleep(3)
+    sleep(2)
     clear()
 
 
@@ -70,8 +70,8 @@ class Boat:
         self.symbol = ''
         self.hp = 0
         self.size = 0
-        self.position = []
-        self.hasSunk = False
+        self.standing_positions = []  # These are the positions of the boat that have not been hit yet.
+        self.permanent_positions = []  # These never change.
 
     def __str__(self):
         return '{} has {} hp.'.format(self.name, self.hp)
@@ -79,13 +79,12 @@ class Boat:
     def hit(self, coordinates, owner_name, attacker_name):
         self.hp -= 1
         print("{} has hit {}'s {}!! hp left = {}".format(attacker_name, owner_name, self.name, self.hp))
-        self.position.pop(self.position.index(coordinates))
+        self.standing_positions.pop(self.standing_positions.index(coordinates))
         if self.hp == 0:
             self.sink(owner_name)
 
     def sink(self, owner_name):
         print("{}'s {} was sunk!".format(owner_name, self.name))
-        self.hasSunk = True
 
 
 class Cruiser(Boat):
@@ -639,16 +638,19 @@ class Player:
 
                     for column in range(col_names.index(aux[0]), (col_names.index(aux[1])) + 1):
                         coord = my_start_pos['row'] + col_names[column]
-                        my_boat.position.append(coord)
+                        my_boat.standing_positions.append(coord)
+                        my_boat.permanent_positions.append(coord)
                 else:
                     for row in range(row_names.index(coordinates[0][0]), (row_names.index(coordinates[1][0])) + 1):
                         coord = row_names[row] + my_start_pos['column']
-                        my_boat.position.append(coord)
+                        my_boat.standing_positions.append(coord)
+                        my_boat.permanent_positions.append(coord)
             else:
                 coord = my_start_pos['Coord']
-                my_boat.position.append(coord)
+                my_boat.standing_positions.append(coord)
+                my_boat.permanent_positions.append(coord)
 
-            for position in my_boat.position:
+            for position in my_boat.standing_positions:
                 self.board[position] = my_boat.symbol
 
         end_pos = {}
@@ -698,7 +700,7 @@ class ComputerOpponent(Player):
         # Size of "board"
         rows = 9
         cols = 9
-        target_cross_neighbors = []
+        target_neighbors = []
         row_index = row_names.index(my_hit_coordinates[0])
         col_index = col_names.index(my_hit_coordinates[1:])
         neighbors = []
@@ -730,14 +732,41 @@ class ComputerOpponent(Player):
                                           (y == y2) and
                                           (0 <= x2 <= rows) and
                                           (0 <= y2 <= cols))]
+
         else:
             print('Insert Error here. Func get_target_cross_neighbors. wrong arguments.')
 
         for row_neighbor_index, col_neighbor_index in neighbors(row_index, col_index):
             name = row_names[row_neighbor_index] + str(col_names[col_neighbor_index])
-            target_cross_neighbors.append(name)
+            target_neighbors.append(name)
 
-        return list(set(target_cross_neighbors) & set(self.available_targets))
+        return list(set(target_neighbors) & set(self.available_targets))
+
+    def remove_adjacent_tiles_from_available_targets(self, my_boat_permanent_position):
+
+        rows = 9
+        cols = 9
+
+        neighbors = lambda x, y: [(x2, y2) for x2 in range(x - 1, x + 2)
+                                  for y2 in range(y - 1, y + 2)
+                                  if (-1 < x <= rows and
+                                      -1 < y <= cols and
+                                      (x != x2 or y != y2) and
+                                      (0 <= x2 <= rows) and
+                                      (0 <= y2 <= cols))]
+
+        for my_hit_coordinates in my_boat_permanent_position:
+            row_index = row_names.index(my_hit_coordinates[0])
+            col_index = col_names.index(my_hit_coordinates[1:])
+
+            for row_neighbor_index, col_neighbor_index in neighbors(row_index, col_index):
+                name = row_names[row_neighbor_index] + str(col_names[col_neighbor_index])
+                try:
+                    self.available_targets.pop(self.available_targets.index(name))
+                except ValueError:
+                    pass
+                else:
+                    pass
 
     def update_targets(self, *nargs):
 
@@ -745,10 +774,12 @@ class ComputerOpponent(Player):
             hit = nargs[0]
             hit_coordinates = nargs[1]
             boat_position = []
-        elif len(nargs) == 3:
+            boat_permanent_position = []
+        elif len(nargs) == 4:
             hit = nargs[0]
             hit_coordinates = nargs[1]
             boat_position = nargs[2]
+            boat_permanent_position = nargs[3]
         else:
             print('Insert Exception here! Invalid number of arguments on func update_targets')
             return
@@ -758,6 +789,8 @@ class ComputerOpponent(Player):
         if hit:
             # Easy Mode
             if self.difficulty == 'Easy':
+                if len(boat_position) ==  0:  # Boat is still alive
+                    self.remove_adjacent_tiles_from_available_targets(boat_permanent_position)
                 self.targets = self.available_targets.copy()  # Fire at new random positions
 
             # Normal Mode
@@ -779,6 +812,7 @@ class ComputerOpponent(Player):
                         self.first_hit_position = hit_coordinates
 
                 else:
+                    self.remove_adjacent_tiles_from_available_targets(boat_permanent_position)
                     self.targets = self.available_targets.copy()  # Fire at new random positions
                     self.searching_for_boat = False
                     self.first_hit_position = ''
@@ -788,6 +822,7 @@ class ComputerOpponent(Player):
                 if len(boat_position) > 0:  # Boat is still alive
                     self.targets = boat_position  # Keep focused on that boat
                 else:
+                    self.remove_adjacent_tiles_from_available_targets(boat_permanent_position)
                     self.targets = self.available_targets.copy()  # Fire at new random positions
             else:
                 print('Invalid Difficulty inserted. Defaulting to EASY')
@@ -804,12 +839,12 @@ def check_hit(my_attacking_player, my_defending_player, my_shot_coordinates):
     #  If no matches, it's a missed shot.
     for boat in my_defending_player.boats:
 
-        if my_shot_coordinates in boat.position:
+        if my_shot_coordinates in boat.standing_positions:
             boat.hit(my_shot_coordinates, my_defending_player.name, my_attacking_player.name)
             my_defending_player.board[my_shot_coordinates] = 'X'
             my_attacking_player.hidden_board[my_shot_coordinates] = boat.symbol
             if isinstance(my_attacking_player, ComputerOpponent):
-                my_attacking_player.update_targets(True, my_shot_coordinates, boat.position)
+                my_attacking_player.update_targets(True, my_shot_coordinates, boat.standing_positions, boat.permanent_positions)
             return True
 
     print('{} missed the shot!'.format(my_attacking_player.name))
